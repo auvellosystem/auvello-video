@@ -30,6 +30,9 @@ def _float(name: str, default: float) -> float:
 
 @dataclass(frozen=True)
 class Settings:
+    ml_token_provider_url: str = os.getenv("ML_TOKEN_PROVIDER_URL", "").strip().rstrip("/")
+    ml_token_provider_secret: str = os.getenv("ML_TOKEN_PROVIDER_SECRET", "")
+
     content_mode: str = os.getenv("CONTENT_MODE", "videos").strip().lower()
     video_recipient: str = os.getenv("VIDEO_RECIPIENT", "5528999676818").strip()
     video_output_dir: str = os.getenv("VIDEO_OUTPUT_DIR", "generated-videos")

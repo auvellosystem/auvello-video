@@ -1,31 +1,31 @@
-# Auvello Video — projeto independente
+# Auvello Video
 
-Este projeto e uma copia independente da base Auvello, com captura de ofertas, geracao de link de afiliado, renderizacao de video vertical e entrega no WhatsApp 55 28 99967-6818. A publicacao no TikTok e manual.
+Projeto completo para localizar ofertas, gerar links de afiliado, montar videos verticais e entregar no WhatsApp 55 28 99967-6818. A publicacao no TikTok e manual.
 
-Instale em uma pasta nova, publique em um repositorio novo e crie um servico novo no Render. Consulte **COMECE-AQUI.md** para o procedimento completo. Nao substitua arquivos do projeto anterior.
+Abra COMECE-AQUI.md para substituir os arquivos e configurar o projeto.
 
-O modo padrao e `CONTENT_MODE=videos`. Os modulos de grupos da base foram mantidos como opcao, mas nao sao executados nesse modo; nao e necessario configurar destinos de grupos.
+## Fluxo atual
 
-## Conteudo
+O projeto pode aproveitar a autorizacao do Mercado Livre do servico antigo via ML_TOKEN_PROVIDER_URL e ML_TOKEN_PROVIDER_SECRET. Seu banco Neon permanece separado. O servico antigo precisa da atualizacao do provedor de tokens entregue no pacote integracao-mercado-livre.zip; configurar somente a URL nao cria esse endpoint.
 
-- MP4 de 18 segundos, 1080 x 1920, 25 fps, H.264/AAC.
-- Tres cenas com imagem do produto, nome, preco e movimento suave.
-- Descricao com link de afiliado, publicidade e hashtags.
-- Ate duas ofertas por ciclo de 30 minutos; cooldown configuravel.
-- Sem narracao ou musica nesta versao.
+Os dados do programa de afiliados (modo, tag e cookie) continuam sendo configurados neste projeto para gerar seus links.
 
-## Validacao e limites
+## Videos
 
-A renderizacao completa e o layout foram verificados com um produto demonstrativo. Testes simulados verificaram upload, destinatario e cooldown. Nao foi feito envio real nem deploy. Configure as credenciais e conecte uma nova sessao antes de testar no seu ambiente.
+MP4 de 18 segundos, 1080 x 1920, 25 fps, H.264/AAC, com tres cenas, imagem do produto, preco e movimento suave. Sem narracao nem musica nesta versao. Descricao com link de afiliado e hashtags.
 
-O cooldown so e registrado apos sucesso de envio. Se a conexao falhar depois de a mensagem ser entregue, pode haver repeticao no ciclo seguinte. Use uma unica instancia do worker; nao ha reserva distribuida de tarefas. A renderizacao e sequencial no processo Python.
+O padrao e duas ofertas por ciclo de 30 minutos, sujeito aos filtros e ao cooldown. A renderizacao e sequencial. Produtos sem imagem ou sem preco positivo em BRL nao geram video.
 
-O preco vem do cache da descoberta; confira disponibilidade antes de publicar. Produtos sem imagem ou preco positivo em BRL nao geram video. Arquivos locais podem desaparecer em redeploy sem disco persistente; em disco persistente, remova videos antigos quando necessario.
-
-## Testes sem envio
+## Testes
 
 ```bash
 python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
 node tests/test_media_route.mjs
 ```
+
+Seis testes Python e o teste Node de midia passaram. O MP4 completo foi verificado com produto demonstrativo. A integracao do servico antigo tambem foi simulada. Nao foi realizado deploy nem envio real.
+
+## Limites
+
+O preco vem do cache: confira disponibilidade antes de publicar. Mantenha uma instancia do worker. O cooldown so e registrado depois do sucesso; uma perda de conexao apos a entrega pode causar repeticao no ciclo seguinte. Os arquivos ficam em generated-videos, ignorado pelo Git, e podem desaparecer em redeploy sem armazenamento persistente. Se houver disco persistente, remova videos antigos conforme necessario.

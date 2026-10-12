@@ -1,114 +1,90 @@
-# Instalacao nova: pasta, GitHub e Render separados
+# Pasta completa do projeto novo
 
-## 1. Pasta nova no computador
+Este ZIP e completo e SEM uma pasta extra na raiz. Ao extrair diretamente na pasta do projeto, app, tests, whatsapp-service, main.py e Dockerfile ficam no primeiro nivel.
 
-Extraia o ZIP em uma pasta nova chamada `auvello-video`. Abra essa pasta no VS Code. Abra a pasta que contem diretamente `main.py`, `Dockerfile` e `README.md`.
+## 1. Substituir os arquivos
 
-Esta entrega nao inclui `.git`, `.env`, credenciais, tokens, sessao de WhatsApp ou banco de dados do projeto anterior.
+Feche processos que estejam executando o projeto. Na pasta do projeto novo que ja esta conectada ao GitHub, preserve .env e .git. Se preferir apagar tudo antes de extrair, copie esses dois itens para fora e restaure-os depois. Eles nao estao neste ZIP.
 
-## 2. Repositorio novo no GitHub
+Remova os outros arquivos e pastas dessa copia do projeto novo, incluindo as subpastas auvello-cloud e auvello-video criadas por engano ao extrair o pacote de integracao. Nao remova nem modifique a pasta do projeto antigo.
 
-Crie um repositorio vazio chamado `auvello-video`, sem adicionar README, licenca ou gitignore pela interface. No terminal do VS Code, dentro da pasta nova:
+Extraia o CONTEUDO deste ZIP diretamente nessa pasta. Se o Windows criar automaticamente uma pasta com o nome do ZIP, abra-a e copie o conteudo para a pasta do projeto. Nao deixe esse ZIP dentro do repositorio.
 
-```bash
-git init
-git branch -M main
-git add .
-git commit -m "Inicia Auvello Video independente"
+No VS Code, abra a pasta que contem diretamente main.py e Dockerfile.
+
+## 2. Seu .env
+
+Preserve DATABASE_URL apontando para o Neon NOVO. Acrescente estas duas linhas ao .env existente:
+
+```dotenv
+ML_TOKEN_PROVIDER_URL=https://auvello-cloud.onrender.com
+ML_TOKEN_PROVIDER_SECRET=MESMO_SEGREDO_CONFIGURADO_NO_RENDER_ANTIGO
 ```
 
-Depois copie a URL do novo repositorio no GitHub e use:
+Gere a chave no seu terminal, nao aqui no chat:
 
-```bash
-git remote add origin URL_DO_REPOSITORIO_NOVO
-git push -u origin main
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-Substitua `URL_DO_REPOSITORIO_NOVO` pela URL real, por exemplo `https://github.com/SEU_USUARIO/auvello-video.git`. Nao use a URL do `auvello-cloud`.
-
-## 3. Banco de dados separado
-
-Use um novo banco PostgreSQL e configure sua URL em `DATABASE_URL`. Nao use a URL do banco antigo: esta base guarda sessao WhatsApp, tokens Mercado Livre, ofertas e cooldown em tabelas com os mesmos nomes. Um banco separado evita que os dois projetos compartilhem esses registros.
-
-A inicializacao cria as tabelas necessarias. Para teste local sem PostgreSQL, o padrao e SQLite em `auvello-video.db`. Para a instalacao no Render, use o banco separado para manter as credenciais persistentes.
-
-## 4. Credenciais e autorizacao do Mercado Livre
-
-Voce pode preencher o ID e o segredo do aplicativo Mercado Livre que ja utiliza, mantendo a URI de redirecionamento exatamente como cadastrada no aplicativo. Configure os demais dados de afiliacao no projeto novo.
-
-Crie um `.env` local a partir de `.env.example`, preencha as credenciais e a `DATABASE_URL` do banco NOVO. Nao copie tokens ou a sessao do WhatsApp do projeto antigo.
-
-No terminal local:
-
-```bash
-python -m pip install -r requirements.txt
-python main.py --auth
-```
-
-Siga a autorizacao exibida e cole somente o parametro `code` no terminal quando solicitado. Esse processo salva os tokens no banco novo. Faca isso antes de iniciar a descoberta no Render: a autorizacao atual e interativa e precisa do terminal.
-
-O `.env` e ignorado pelo Git. Nunca envie o arquivo ou tokens ao GitHub.
-
-## 5. Novo servico no Render
-
-Crie um Web Service conectado ao novo repositorio `auvello-video`, branch `main`, usando o runtime Docker. O Dockerfile deve ficar na raiz do repositorio. Ele ja instala Python, Node, Pillow, FFmpeg e fontes, e inicia `start.sh`; nao precisa preencher um comando separado para substituir o CMD do Dockerfile.
-
-Se a interface oferecer Health Check Path, use `/health`.
-
-Referencias oficiais: https://render.com/docs/docker e https://render.com/docs/web-services.
-
-No ambiente do NOVO servico, configure:
+Use o resultado como ML_TOKEN_PROVIDER_SECRET nos dois servicos. Mantenha:
 
 ```dotenv
 CONTENT_MODE=videos
 VIDEO_RECIPIENT=5528999676818
 VIDEO_INTERVAL_MINUTES=30
 VIDEO_MAX_PER_CYCLE=2
-DISCOVERY_INTERVAL_MINUTES=10
-COOLDOWN_HOURS=24
-DATABASE_URL=URL_DO_BANCO_NOVO
-WA_MEDIA_TOKEN=SEU_SEGREDO_LONGO
-QR_SECRET=OUTRO_SEGREDO_LONGO
-ML_CLIENT_ID=SEU_APP_ID
-ML_CLIENT_SECRET=SEU_CLIENT_SECRET
-ML_REDIRECT_URI=URI_CADASTRADA_NO_SEU_APP
-AFFILIATE_MODE=portal
-AFFILIATE_TAG=SUA_TAG
-ML_AFFILIATE_COOKIE=SEU_COOKIE_DE_AFILIADO
 ```
 
-Mantenha o modo e os dados de afiliacao que funcionam na sua instalacao anterior. A lista acima usa o modo `portal` da base; se seu fluxo usa outro modo, configure-o de acordo.
+Copie do ambiente antigo os valores de AFFILIATE_MODE, AFFILIATE_TAG e ML_AFFILIATE_COOKIE. A autorizacao compartilhada nao substitui as configuracoes do gerador de links.
 
-Gere cada segredo separadamente no seu terminal com:
+No modo provedor remoto, ML_CLIENT_ID, ML_CLIENT_SECRET e ML_REDIRECT_URI nao sao utilizados pelo projeto novo. Se voce ja os preencheu, podem permanecer. Nao execute python main.py --auth neste modo.
 
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
+Gere tambem valores separados para WA_MEDIA_TOKEN e QR_SECRET antes de ativar o envio. Esses segredos nao sao a chave ML_TOKEN_PROVIDER_SECRET.
+
+Se perdeu seu .env, copie .env.example para .env e preencha suas configuracoes novamente. Este pacote nao contem suas senhas, cookies nem conexao privada do banco.
+
+## 3. Dependencia do projeto antigo
+
+A autorizacao existente so podera ser utilizada depois de atualizar o projeto antigo com os tres arquivos da pasta auvello-cloud do pacote integracao-mercado-livre.zip:
+
+- app/auth.py
+- app/token_provider.py
+- whatsapp-service/index.js
+
+Eles devem ser copiados para o PROJETO ANTIGO, nunca para dentro do novo. O Render antigo tambem precisa receber ML_TOKEN_PROVIDER_SECRET com o mesmo valor do novo.
+
+Esta copia completa nao modifica seu projeto antigo nem instala automaticamente o endpoint nele. A autorizacao antiga precisa estar valida no Neon antigo; se faltar ou estiver revogada, o provedor retorna 503.
+
+## 4. Conferir o repositorio novo
+
+No terminal da pasta do projeto novo:
+
+```powershell
+git remote -v
+git status
 ```
 
-`WA_MEDIA_TOKEN` e compartilhado entre o Python e o Node do novo container. `QR_SECRET` protege a pagina de conexao do WhatsApp. Nao configure `WHATSAPP_SERVICE_URL` no Render: `start.sh` define o endereco interno com a porta correta.
+O remoto deve ser https://github.com/auvellosystem/auvello-video.git. Confira antes de enviar mudancas.
 
-Para usar o painel administrativo herdado, configure tambem `ADMIN_USER` e `ADMIN_PASSWORD` novos. Os destinos `WA_GROUP_*` podem ficar ausentes no modo videos.
+Depois da revisao:
 
-## 6. Nova sessao de WhatsApp
-
-Depois do deploy, abra o endereco do NOVO servico seguido de:
-
-```text
-/qr?key=SEU_QR_SECRET
+```powershell
+git add .
+git commit -m "Atualiza projeto completo de videos e autorizacao compartilhada"
+git push
 ```
 
-Leia o QR com a conta que enviara os videos. O destinatario e `5528999676818`; ele nao define qual conta sera a remetente. Conecte a sessao pelo QR novo; nao copie o armazenamento da sessao do projeto anterior.
+O .env deve continuar ignorado pelo Git. A regra .gitattributes mantem scripts shell com quebras LF para executar no Linux.
 
-O primeiro envio consulta o WhatsApp para confirmar se o destinatario existe. Com a descoberta funcionando e uma oferta elegivel com imagem, o sistema envia o MP4 com a descricao para esse numero.
+## 5. Render novo (ainda sera criado)
 
-Nao basta replicar as variaveis do ambiente antigo: este novo banco precisa da autorizacao Mercado Livre e desta nova conexao WhatsApp.
+Crie um Web Service conectado ao repositorio auvellosystem/auvello-video, branch main, runtime Docker, Dockerfile na raiz. O CMD incluido inicia Node e Python. Deixe Docker Command e Root Directory vazios, se esses campos aparecerem na interface.
 
-## 7. Operacao
+Cadastre no Environment do novo servico as configuracoes do .env, com DATABASE_URL do banco NOVO e ML_TOKEN_PROVIDER_URL do Render ANTIGO. Deixe WHATSAPP_SERVICE_URL ausente: start.sh define automaticamente o endereco interno na porta correta.
 
-A descoberta roda a cada 10 minutos por padrao. Os videos rodam a cada 30 minutos, incluindo uma tentativa na inicializacao; sao tentadas ate duas ofertas por ciclo. Ofertas ficam sujeitas aos filtros de desconto existentes e ao cooldown.
+Conecte a nova sessao WhatsApp abrindo a URL do NOVO servico seguida de /qr?key=SEU_QR_SECRET. A conta que le o QR e a remetente; 5528999676818 e o destinatario.
 
-O endpoint `/send-video` exige o token, aceita MP4 de ate 24 MiB e envia apenas ao destinatario configurado. O MP4 e a descricao tambem ficam em `generated-videos/`, ignorado pelo Git.
+O /health retorna whatsappReady true depois de conectado. A primeira entrega depende de oferta elegivel com imagem, acesso autorizado ao Mercado Livre e geracao do link de afiliado.
 
-A publicacao no TikTok e feita por voce depois de receber o arquivo. Esta primeira versao e sem narracao e musica.
-
-O projeto `auvello-cloud`, seu repositorio e seu servico atual podem continuar rodando em paralelo. Nao altere o modo do servico anterior para instalar esta copia.
+Esta entrega nao inclui rotina para manter servicos gratuitos ativos nem elimina limites da hospedagem. O novo depende da disponibilidade do antigo para obter acesso ao Mercado Livre.
