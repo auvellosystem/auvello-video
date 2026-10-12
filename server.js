@@ -13,6 +13,7 @@ import { promisify } from 'node:util';
 import { initialize, recover, authState } from './store.js';
 import { imageOffer } from './offers.js';
 import { deliver } from './delivery.js';
+import { startKeepAlive } from './keepalive.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const execute = promisify(execFile);
@@ -228,7 +229,11 @@ async function main() {
   await recover(pool);
   const {rows} = await pool.query('SELECT group_id,since FROM av_group_config WHERE id=1');
   if (rows[0]?.group_id) source = {group:rows[0].group_id, since:new Date(rows[0].since).getTime()};
-  app.listen(Number(process.env.PORT || 10000),'0.0.0.0',()=>console.log('Painel Auvello Vídeos iniciado.'));
+  app.listen(Number(process.env.PORT || 10000),'0.0.0.0',()=>{
+    console.log('Painel Auvello Vídeos iniciado.');
+    const keepAlive = startKeepAlive();
+    process.once('SIGTERM',()=>keepAlive.stop());
+  });
   await connect();
   setInterval(()=>work(),5000);
   setInterval(()=>pool.query("UPDATE av_group_jobs SET image=NULL,status=CASE WHEN status='queued' THEN 'cancelled' ELSE status END WHERE image IS NOT NULL AND created_at<NOW()-INTERVAL '7 days' AND status NOT IN ('rendering','sending','description')").catch(()=>{}),3600000);
