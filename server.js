@@ -238,4 +238,7 @@ async function main() {
   setInterval(()=>work(),5000);
   setInterval(()=>pool.query("UPDATE av_group_jobs SET image=NULL,status=CASE WHEN status='queued' THEN 'cancelled' ELSE status END WHERE image IS NOT NULL AND created_at<NOW()-INTERVAL '7 days' AND status NOT IN ('rendering','sending','description')").catch(()=>{}),3600000);
 }
-main().catch(()=>{console.error('Falha ao iniciar. Confira o Neon, as variáveis e se há outra instância usando este banco.');process.exit(1);});
+main().catch(error => {
+  console.error('Falha ao iniciar:', error?.message || error);
+  process.exit(1);
+});
