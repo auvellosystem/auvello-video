@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from .config import settings
 from .models import Product
+from .narration import narration_text, synthesize, audio_duration
 
 
 def money(value: float) -> str:
@@ -22,10 +23,10 @@ def money(value: float) -> str:
 
 def build_caption(product: Product, affiliate_url: str) -> str:
     return (
-        f'{product.name[:300]}\nPor {money(product.price or 0)}\n\n'
+        f'{product.name}\nPor {money(product.price or 0)}\n\n'
         f'Confira a oferta: {affiliate_url}\n\n'
-        'Publicidade • Link de afiliado. Posso receber comissao pela compra.\n'
-        'Preco e disponibilidade podem mudar.\n#Ofertas #Achadinhos #Auvello'
+        'Publicidade • Link de afiliado. Posso receber comissão pela compra.\n'
+        'Preço e disponibilidade podem mudar.\n#Ofertas #Achadinhos #MercadoLivre #Auvello'
     )
 
 
@@ -86,7 +87,7 @@ class VideoRenderer:
         canvas = Image.new('RGB', (1080, 1920), '#10172b')
         draw = ImageDraw.Draw(canvas)
         self._text(draw, 'AUVELLO • ACHADINHOS', 190, 36, '#76e9c4', bold=True, max_lines=1)
-        hooks = ['OLHA ESSA OFERTA', 'CONFIRA O PRECO', 'GOSTOU DO ACHADINHO?']
+        hooks = ['OLHA ESSA OFERTA', 'CONFIRA O PREÇO', 'GOSTOU DO ACHADINHO?']
         self._text(draw, hooks[scene], 280, 50, 'white', bold=True, max_lines=2)
         draw.rounded_rectangle((140, 470, 940, 1150), radius=34, fill='white')
         fitted = ImageOps.contain(image, (730, 610), Image.Resampling.LANCZOS)
@@ -94,11 +95,11 @@ class VideoRenderer:
         self._text(draw, product.name, 1190, 40, 'white', max_lines=3, bold=True)
         self._text(draw, money(product.price), 1405, 78, '#76e9c4', bold=True, max_lines=1)
         if scene == 1 and product.discount_percent > 0:
-            self._text(draw, f'{product.discount_percent:g}% abaixo do preco original', 1510, 31, 'white', max_lines=1)
+            self._text(draw, f'{product.discount_percent:g}% abaixo do preço original', 1510, 31, 'white', max_lines=1)
         else:
             self._text(draw, 'Confira o link e os detalhes da oferta', 1510, 31, 'white', max_lines=2)
         self._text(draw, 'Publicidade • Link de afiliado', 1640, 25, '#b3bad0', max_lines=1)
-        self._text(draw, 'Preco e disponibilidade sujeitos a alteracao', 1685, 22, '#b3bad0', max_lines=1)
+        self._text(draw, 'Preço e disponibilidade sujeitos a alteração', 1685, 22, '#b3bad0', max_lines=1)
         return canvas
 
     def render(self, product: Product, caption: str, *, image: Image.Image | None = None) -> Path:
@@ -110,20 +111,25 @@ class VideoRenderer:
             if not product.picture:
                 raise ValueError('Produto sem imagem.')
             image = self._download(product.picture)
-        key = hashlib.sha256(f'{product.product_id}|{product.price}|{caption}'.encode()).hexdigest()[:20]
+        key = hashlib.sha256(f'narrated-v2|{product.product_id}|{product.price}|{caption}'.encode()).hexdigest()[:20]
         output = self.output_dir / f'oferta-{key}.mp4'
         # Cache permite tentar a entrega novamente sem renderizar a mesma oferta.
         if output.exists():
             return output
         with tempfile.TemporaryDirectory(dir=self.output_dir) as tmp:
             tmp = Path(tmp)
+            speech = narration_text(product)
+            audio, narration_engine = synthesize(speech, tmp)
+            # As tres cenas cobrem toda a fala, sem corta-la no final.
+            frames = math.ceil(max(18, audio_duration(audio) + 0.8) * 25 / 3)
+            total_duration = frames * 3 / 25
             segments = []
             for scene in range(3):
                 card, segment = tmp/f'card-{scene}.png', tmp/f'scene-{scene}.mp4'
                 self._card(product, image, scene).save(card)
                 subprocess.run([
                     'ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(card),
-                    '-vf', "zoompan=z='min(zoom+0.00015,1.022)':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=150:s=1080x1920:fps=25,format=yuv420p",
+                    '-vf', f"zoompan=z='min(zoom+0.00015,1.022)':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d={frames}:s=1080x1920:fps=25,format=yuv420p",
                     '-an', '-c:v', 'libx264', '-threads', '2', '-preset', 'veryfast', '-crf', '24', str(segment),
                 ], check=True, timeout=180)
                 segments.append(segment)
@@ -132,8 +138,9 @@ class VideoRenderer:
             final = tmp/'final.mp4'
             subprocess.run([
                 'ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-f', 'concat', '-safe', '1',
-                '-i', str(concat), '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-t', '18',
-                '-c:v', 'copy', '-c:a', 'aac', '-b:a', '64k', '-movflags', '+faststart', str(final),
+                '-i', str(concat), '-i', str(audio), '-t', str(total_duration),
+                '-map', '0:v:0', '-map', '1:a:0', '-af', 'apad',
+                '-c:v', 'copy', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', str(final),
             ], check=True, timeout=60)
             if final.stat().st_size > 24*1024*1024:
                 raise ValueError('Video gerado excede 24 MiB.')
@@ -141,6 +148,7 @@ class VideoRenderer:
             self.output_dir.joinpath(f'oferta-{key}.json').write_text(json.dumps({
                 'product_id': product.product_id, 'price': product.price,
                 'recipient': settings.video_recipient, 'caption': caption,
+                'narration': speech, 'narration_engine': narration_engine, 'duration': total_duration,
             }, ensure_ascii=False, indent=2), encoding='utf-8')
             final.replace(output)
         return output
