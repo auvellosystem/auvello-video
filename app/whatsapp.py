@@ -1,0 +1,83 @@
+from __future__ import annotations
+
+import time
+import requests
+
+from .config import settings
+
+
+class WhatsAppClient:
+    def send(
+        self,
+        group_key: str,
+        message: str,
+        image_url: str | None = None,
+        group_id_override: str | None = None,
+    ) -> bool:
+        group_id = group_id_override or settings.group_ids.get(group_key)
+        if not group_id:
+            print(f"[whatsapp] grupo nao configurado: {group_key}")
+            return False
+
+        max_retries = max(0, settings.whatsapp_max_retries)
+        payload = {"groupId": group_id, "message": message}
+        if image_url:
+            payload["imageUrl"] = image_url
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.post(
+                    f"{settings.whatsapp_service_url}/send",
+                    json=payload,
+                    timeout=settings.request_timeout,
+                )
+            except requests.RequestException as exc:
+                print(f"[whatsapp] falha de conexao: {exc}")
+                return False
+
+            if response.ok:
+                return True
+
+            text = response.text[:500]
+            is_rate_limit = (
+                response.status_code == 429
+                or "rate-overlimit" in text.lower()
+                or "rate limit" in text.lower()
+            )
+            if is_rate_limit and attempt < max_retries:
+                wait = max(1.0, settings.whatsapp_rate_limit_retry_seconds) * (attempt + 1)
+                print(f"[whatsapp] limite de envio; aguardando {wait:.0f}s antes da tentativa {attempt + 2}/{max_retries + 1}")
+                time.sleep(wait)
+                continue
+
+            print(f"[whatsapp] erro {response.status_code}: {text[:300]}")
+            return False
+        return False
+
+
+    def send_video(self, video_path, caption: str) -> bool:
+        """Envio unico: falhas ficam para o proximo ciclo, sem retry cego."""
+        import base64
+        from pathlib import Path
+        path = Path(video_path)
+        if not settings.whatsapp_media_token:
+            raise ValueError("Configure WA_MEDIA_TOKEN para enviar videos.")
+        if path.stat().st_size > 24 * 1024 * 1024:
+            raise ValueError("Video excede o limite interno de 24 MiB.")
+        headers = {
+            "Content-Type": "video/mp4",
+            "Authorization": "Bearer " + settings.whatsapp_media_token,
+            "X-Video-Caption": base64.b64encode(caption.encode()).decode(),
+        }
+        try:
+            with path.open("rb") as video:
+                response = requests.post(
+                    f"{settings.whatsapp_service_url}/send-video", data=video,
+                    headers=headers, timeout=(10, 180),
+                )
+            if response.ok:
+                return True
+            print(f"[video-whatsapp] envio recusado: HTTP {response.status_code}")
+        except requests.RequestException:
+            print("[video-whatsapp] falha de conexao; entrega pode estar incerta")
+        return False
