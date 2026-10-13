@@ -52,6 +52,23 @@ class NarrationTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     synthesize('Olá',Path(tmp))
 
+    def test_piper_generates_audio_from_model_and_matching_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            model = root / 'pt_BR-faber-medium.onnx'
+            model.write_bytes(b'model')
+            Path(f'{model}.json').write_text('{}', encoding='utf-8')
+            output_dir = root / 'output'
+            output_dir.mkdir()
+            def run(args, **kwargs):
+                Path(args[args.index('-f') + 1]).write_bytes(b'audio' * 100)
+            with patch.dict(os.environ, {'TTS_ENGINE':'piper', 'TTS_MODEL':str(model)}), \
+                 patch('app.narration.subprocess.run', run):
+                audio, engine = synthesize('Olá', output_dir)
+            self.assertEqual(engine, 'piper')
+            self.assertEqual(audio.name, 'narration.wav')
+            self.assertGreater(audio.stat().st_size, 100)
+
 
 if __name__ == '__main__':
     unittest.main()

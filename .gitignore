@@ -7,3 +7,5 @@ __pycache__/
 *.pyc
 videos/
 temp/
+models/*.onnx
+models/*.onnx.json

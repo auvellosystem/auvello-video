@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import wave
 
 
@@ -43,6 +44,19 @@ def narration_text(product) -> str:
 async def _online(text: str, output: Path, voice: str):
     import edge_tts
     await asyncio.wait_for(edge_tts.Communicate(text, voice, rate='+5%').save(str(output)), timeout=45)
+
+
+def _piper(text: str, output: Path, model: Path):
+    config = Path(f'{model}.json')
+    if not model.is_file():
+        raise FileNotFoundError(f'Modelo Piper não encontrado: {model}')
+    if not config.is_file():
+        raise FileNotFoundError(f'Configuração Piper não encontrada: {config}')
+    subprocess.run(
+        [sys.executable, '-m', 'piper', '-m', str(model), '-c', str(config),
+         '-f', str(output), '--', text],
+        check=True, capture_output=True, text=True, timeout=120,
+    )
 
 
 def _local(text: str, output: Path):
@@ -88,10 +102,26 @@ def _local(text: str, output: Path):
 
 
 def synthesize(text: str, folder: Path) -> tuple[Path, str]:
-    engine = os.getenv('TTS_ENGINE', 'edge')
+    engine = os.getenv('TTS_ENGINE', 'piper')
     voice = os.getenv('TTS_VOICE', 'pt-BR-AntonioNeural')
-    if engine not in ('edge', 'local'):
-        raise ValueError('TTS_ENGINE deve ser edge ou local.')
+    fallback = os.getenv('TTS_FALLBACK', 'local')
+    if engine not in ('edge', 'piper', 'local'):
+        raise ValueError('TTS_ENGINE deve ser edge, piper ou local.')
+    if engine == 'piper':
+        default_model = Path(__file__).resolve().parent.parent / 'models' / 'pt_BR-faber-medium.onnx'
+        model = Path(os.getenv('TTS_MODEL', str(default_model)))
+        if not model.is_absolute():
+            model = Path(__file__).resolve().parent.parent / model
+        output = folder / 'narration.wav'
+        try:
+            _piper(text, output, model)
+            if output.stat().st_size < 100:
+                raise ValueError('Narração Piper vazia.')
+            return output, 'piper'
+        except Exception:
+            output.unlink(missing_ok=True)
+            if fallback != 'local':
+                raise RuntimeError('Narração Piper indisponível; tente novamente.') from None
     if engine == 'edge':
         if not re.fullmatch(r'pt-BR-[A-Za-z]+Neural', voice):
             raise ValueError('Escolha uma voz pt-BR do Edge TTS.')
@@ -104,7 +134,7 @@ def synthesize(text: str, folder: Path) -> tuple[Path, str]:
         except Exception:
             online.unlink(missing_ok=True)
             # Se a voz online estiver indisponivel, nunca entrega video mudo.
-            if os.getenv('TTS_FALLBACK', 'local') != 'local':
+            if fallback != 'local':
                 raise RuntimeError('Narração online indisponível; tente novamente.') from None
     output = folder / 'narration.wav'
     _local(text, output)

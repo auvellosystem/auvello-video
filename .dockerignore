@@ -7,3 +7,5 @@ __pycache__
 temp
 videos
 tests
+models/*.onnx
+models/*.onnx.json

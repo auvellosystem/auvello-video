@@ -177,6 +177,7 @@ async function work() {
       await pool.query("UPDATE av_group_jobs SET status='queued' WHERE id=$1", [job.id]); return;
     }
     const result = JSON.parse(await readFile(path.join(folder,'result.json'),'utf8'));
+    if (result.narration_engine === 'piper') console.log('Narração gerada com Piper Faber (pt-BR).');
     if (result.narration_engine === 'local') console.log('Usada a voz local de reserva nesta oferta.');
     const video = await readFile(result.video);
     if (video.length > 24*1024*1024) throw new Error('Video muito grande');

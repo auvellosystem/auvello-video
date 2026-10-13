@@ -26,9 +26,10 @@ Você baixa o vídeo e publica manualmente no TikTok.
 | `VIDEO_RECIPIENT` | `5528999676818` |
 | `PYTHON_BIN` | `python3` no Docker/Render; `python` no Windows, se for executar localmente. |
 | `PORT` | `10000` localmente; no Render o serviço usa a porta fornecida pelo ambiente. |
-| `TTS_ENGINE` | `edge` para voz online; `local` para voz sintetizada sem internet. Padrão: `edge`. |
-| `TTS_VOICE` | `pt-BR-AntonioNeural` (masculina) ou `pt-BR-FranciscaNeural` (feminina). Padrão: Antonio. |
-| `TTS_FALLBACK` | `local` para usar a voz de reserva se a online falhar; `none` para aguardar nova tentativa. Padrão: `local`. |
+| `TTS_ENGINE` | `piper` para usar o modelo neural Faber; `edge` para voz online; `local` para eSpeak. Padrão: `piper`. |
+| `TTS_MODEL` | Caminho do arquivo `.onnx` do Piper. Padrão: `models/pt_BR-faber-medium.onnx`. |
+| `TTS_VOICE` | Usada somente com `TTS_ENGINE=edge`: `pt-BR-AntonioNeural` ou `pt-BR-FranciscaNeural`. |
+| `TTS_FALLBACK` | `local` usa eSpeak como reserva se Piper/Edge falhar; `none` interrompe a geração. Padrão: `local`. |
 
 Não coloque credenciais do Mercado Livre. Use o banco do projeto novo. A sessão WhatsApp,
 a seleção do grupo e a fila são persistidas em tabelas `av_group_*`. A senha do painel
@@ -41,7 +42,11 @@ descrição. Não lê a URL nem as hashtags em voz alta. Para títulos longos, a
 somente as primeiras palavras; o nome completo permanece na descrição. Não inventa
 características, benefícios, avaliações ou um desconto diferente do recebido.
 
-A voz online usa `edge-tts`, sem chave de API, e depende da disponibilidade do serviço
+O Dockerfile baixa o modelo neural brasileiro Faber e seu arquivo `.onnx.json` durante
+a construção da imagem. Assim, o modelo não precisa ser enviado ao GitHub. O Piper não
+depende de serviço externo durante a geração. Se Piper falhar, a configuração padrão
+usa eSpeak como reserva.
+Também é possível selecionar `edge-tts`, sem chave de API, que depende de serviço
 externo. Somente o roteiro da oferta é enviado para gerar a voz; não envia as
 credenciais nem o histórico do grupo. Se falhar, a voz local eSpeak NG é utilizada
 e registrada nos logs. Essa voz de reserva soa mais robótica. O vídeo não é entregue

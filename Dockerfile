@@ -6,6 +6,7 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages -r requirement
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY . .
+RUN mkdir -p /app/models && python3 -c "from urllib.request import urlretrieve; base='https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx'; urlretrieve(base, '/app/models/pt_BR-faber-medium.onnx'); urlretrieve(base + '.json', '/app/models/pt_BR-faber-medium.onnx.json')"
 ENV NODE_ENV=production PORT=10000 PYTHON_BIN=python3
 EXPOSE 10000
 CMD ["node", "server.js"]

@@ -2,3 +2,4 @@ Pillow==11.3.0
 requests==2.32.5
 edge-tts==7.2.8
 espeakng-loader==0.2.4
+piper-tts==1.8.0
